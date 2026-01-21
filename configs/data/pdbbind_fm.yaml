@@ -1,0 +1,32 @@
+_target_: src.datasets.pdbbind_fm.PDBBindDataModule
+args:
+  all_atoms: ${common.all_atoms}
+  atom_max_neighbors: ${common.atom_max_neighbors}
+  atom_radius: ${common.atom_radius}
+  batch_size_per_device: 8
+  c_alpha_max_neighbors: ${common.c_alpha_max_neighbors}
+  cache_path: ${paths.data_dir}/cache
+  data_dir: ${paths.data_dir}/PDBBind_processed/
+  esm_embeddings_path: ${paths.data_dir}/esm2_3billion_embeddings.pt
+  limit_complexes: 0
+  matching_maxiter: 20
+  matching_popsize: 20
+  max_lig_size: null
+  max_radius: 5.0
+  no_torsion: ${common.no_torsion}
+  num_conformers: 1
+  num_inference_complexes: 500
+  num_workers_for_preprocess: 0
+  num_workers: 4
+  receptor_radius: ${common.receptor_radius}
+  remove_hs: ${common.remove_hs}
+  split_test: ${paths.data_dir}/splits/timesplit_test
+  split_train: ${paths.data_dir}/splits/timesplit_no_lig_overlap_train
+  split_val: ${paths.data_dir}/splits/timesplit_no_lig_overlap_val
+  tor_sigma_max: 3.14
+  tor_sigma_min: 0.03
+  tr_sigma_max: 8.0
+  tr_sigma_min: 0.1
+  rot_sigma_max: 1.55
+  rot_sigma_min: 0.03
+  confidence_model_path: ${paths.log_dir}/diffdock_confidence_model/

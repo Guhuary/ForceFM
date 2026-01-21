@@ -1,0 +1,15 @@
+/data/
+/workdir/
+/notebooks/
+/results/
+/src/datasets/pdbbind.py
+/src/datasets/pdbbind_fm.py
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Optional: common local files
+.vscode/
+

@@ -1,0 +1,7 @@
+all_atoms: false
+atom_max_neighbors: 8
+atom_radius: 5
+c_alpha_max_neighbors: 24
+receptor_radius: 15.0
+remove_hs: true
+no_torsion: false
