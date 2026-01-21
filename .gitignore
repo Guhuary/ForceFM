@@ -1,4 +1,6 @@
-/data/
+/data/*
+!data/splits
+!data/*.csv
 /workdir/
 /notebooks/
 /results/
