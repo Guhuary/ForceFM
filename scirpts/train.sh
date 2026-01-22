@@ -1,8 +1,15 @@
 
 # in 07 base
-CUDA_VISIBLE_DEVICES=0,1,2,3 screen -U python src/train_base.py task_name=base trainer.check_val_every_n_epoch=10 \
-    trainer=ddp trainer.devices=4 \
+torchrun --nproc_per_node $SENSECORE_ACCELERATE_DEVICE_COUNT --nnodes $SENSECORE_PYTORCH_NNODES \
+    --node_rank $SENSECORE_PYTORCH_NODE_RANK --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+    src/train_base.py task_name=base trainer.check_val_every_n_epoch=10 \
+    trainer=ddp trainer.devices=auto \
     data.args.batch_size_per_device=20
+
+CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nproc_per_node 2 \
+    src/train_base.py task_name=base trainer.check_val_every_n_epoch=10 \
+    trainer=ddp trainer.devices=auto \
+    data.args.batch_size_per_device=8
 
 CUDA_VISIBLE_DEVICES=0,1,2,3 screen -U python src/train_base.py task_name=base trainer.check_val_every_n_epoch=10 \
     trainer=ddp trainer.devices=4 \

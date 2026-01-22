@@ -47,9 +47,9 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
     log.info(f"Instantiating model <{cfg.model._target_}>")
-    from src.module.FlowMatch import Base_FM_Model
-    model = Base_FM_Model.load_from_checkpoint(cfg.ckpt_path, args=cfg.model.args)
-    # model: LightningModule = hydra.utils.instantiate(cfg.model)
+    # from src.module.FlowMatch import Base_FM_Model
+    # model = Base_FM_Model.load_from_checkpoint(cfg.ckpt_path, args=cfg.model.args)
+    model: LightningModule = hydra.utils.instantiate(cfg.model)
 
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = instantiate_callbacks(cfg.get("callbacks"))

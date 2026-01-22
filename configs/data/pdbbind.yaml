@@ -7,7 +7,7 @@ args:
   c_alpha_max_neighbors: ${common.c_alpha_max_neighbors}
   cache_path: ${paths.data_dir}/cache
   data_dir: ${paths.data_dir}/PDBBind_processed/
-  esm_embeddings_path: ${paths.data_dir}/esm2_3billion_embeddings.pt
+  esm_embeddings_path: ${paths.data_dir}/embeddings_output
   limit_complexes: 0
   matching_maxiter: 20
   matching_popsize: 20
@@ -16,7 +16,7 @@ args:
   no_torsion: ${common.no_torsion}
   num_conformers: 1
   num_inference_complexes: 500
-  num_workers_for_preprocess: 0
+  num_workers_for_preprocess: 64
   num_workers: 4
   receptor_radius: ${common.receptor_radius}
   remove_hs: ${common.remove_hs}
