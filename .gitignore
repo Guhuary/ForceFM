@@ -1,7 +1,10 @@
 /data/*
 !data/splits
 !data/*.csv
-/workdir/
+data/p2rank/
+!data/p2rank/results.csv
+/workdir/*
+!/workdir/diffdock_confidence_model
 /notebooks/
 /results/
 /src/datasets/pdbbind.py
