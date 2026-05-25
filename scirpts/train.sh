@@ -43,3 +43,11 @@ CUDA_VISIBLE_DEVICES=3 screen -U  python inference.py --out_dir results/base2_68
 #     trainer=ddp trainer.devices=4 paths.data_dir=/mnt/sharedata/ssd_large/users/guohl/datasets/ai4sci/pdbbind2020 \
 #     data.args.batch_size_per_device=20 \
 #     ckpt_path=/mnt/sharedata/ssd_large/users/guohl/ai4sci/ForceFM2/workdir/basemodel/epoch_1329.ckpt
+
+torchrun --nproc_per_node $SENSECORE_ACCELERATE_DEVICE_COUNT --nnodes $SENSECORE_PYTORCH_NNODES \
+    --node_rank $SENSECORE_PYTORCH_NODE_RANK --master_addr $MASTER_ADDR --master_port $MASTER_PORT \
+    src/train_base.py task_name=base_finetune trainer.check_val_every_n_epoch=10 \
+    trainer=ddp trainer.devices=auto trainer.num_nodes=1 \
+    trainer.check_val_every_n_epoch=1 \
+    data.args.batch_size_per_device=10 trainer.max_epochs=50 model.args.lr=1e-5 \
+    ckpt_path=/mnt/sharedata/ssd_large/users/guohl/ai4sci/ForceFM2/workdir/basemodel/last.ckpt

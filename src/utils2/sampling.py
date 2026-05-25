@@ -39,49 +39,49 @@ def randomize_position(data_list, no_torsion, no_random, tr_sigma_max):
             tr_update = torch.normal(mean=0, std=tr_sigma_max, size=(1, 3))     # 
             complex_graph['ligand'].pos += tr_update
 
-        # Cut protein
-        # Dist between rec and lig
-        # ligand_pos = complex_graph['ligand'].pos
-        receptor_pos = complex_graph['receptor'].pos
-        # diff = receptor_pos.unsqueeze(1) - ligand_pos.unsqueeze(0) # N_rec x N_lig x 3
-        # dist = torch.linalg.norm(diff, dim=-1)
-        # min_dist = dist.min(dim=1).values
+        # # Cut protein
+        # # Dist between rec and lig
+        # # ligand_pos = complex_graph['ligand'].pos
+        # receptor_pos = complex_graph['receptor'].pos
+        # # diff = receptor_pos.unsqueeze(1) - ligand_pos.unsqueeze(0) # N_rec x N_lig x 3
+        # # dist = torch.linalg.norm(diff, dim=-1)
+        # # min_dist = dist.min(dim=1).values
 
-        # Dist between rec and prior
-        diff_prior = receptor_pos.unsqueeze(1) - prior.unsqueeze(0)
-        dist_prior = torch.linalg.norm(diff_prior, dim=-1)
-        min_dist_prior = dist_prior.min(dim=1).values
+        # # Dist between rec and prior
+        # diff_prior = receptor_pos.unsqueeze(1) - prior.unsqueeze(0)
+        # dist_prior = torch.linalg.norm(diff_prior, dim=-1)
+        # min_dist_prior = dist_prior.min(dim=1).values
 
-        # filter
-        cutoff_lig = 20
-        receptor_mask = min_dist_prior < (cutoff_lig)
-        kept_idx = receptor_mask.nonzero(as_tuple=False).view(-1)
+        # # filter
+        # cutoff_lig = 20
+        # receptor_mask = min_dist_prior < (cutoff_lig)
+        # kept_idx = receptor_mask.nonzero(as_tuple=False).view(-1)
 
-        if kept_idx.numel() == 0:
-            print(f"Skip one complex due to empty receptor region for {complex_graph.name[0]}, original {receptor_pos.shape[0]}")
-            continue
-        # update receptor 
-        complex_graph['receptor'].x = complex_graph['receptor'].x[kept_idx]
-        complex_graph['receptor'].pos = receptor_pos[kept_idx]
-        if 'mu_r_norm' in complex_graph['receptor']:
-            complex_graph['receptor'].mu_r_norm = complex_graph['receptor'].mu_r_norm[kept_idx]
-        if 'side_chain_vecs' in complex_graph['receptor']:
-            complex_graph['receptor'].side_chain_vecs = complex_graph['receptor'].side_chain_vecs[kept_idx]
+        # if kept_idx.numel() == 0:
+        #     print(f"Skip one complex due to empty receptor region for {complex_graph.name[0]}, original {receptor_pos.shape[0]}")
+        #     continue
+        # # update receptor 
+        # complex_graph['receptor'].x = complex_graph['receptor'].x[kept_idx]
+        # complex_graph['receptor'].pos = receptor_pos[kept_idx]
+        # if 'mu_r_norm' in complex_graph['receptor']:
+        #     complex_graph['receptor'].mu_r_norm = complex_graph['receptor'].mu_r_norm[kept_idx]
+        # if 'side_chain_vecs' in complex_graph['receptor']:
+        #     complex_graph['receptor'].side_chain_vecs = complex_graph['receptor'].side_chain_vecs[kept_idx]
 
-        # rebuild edge
-        edge_index = complex_graph['receptor', 'rec_contact', 'receptor'].edge_index
-        edge_mask = receptor_mask[edge_index[0]] & receptor_mask[edge_index[1]]
-        edge_index = edge_index[:, edge_mask]
+        # # rebuild edge
+        # edge_index = complex_graph['receptor', 'rec_contact', 'receptor'].edge_index
+        # edge_mask = receptor_mask[edge_index[0]] & receptor_mask[edge_index[1]]
+        # edge_index = edge_index[:, edge_mask]
         
-        old_to_new = -torch.ones(receptor_mask.shape[0], dtype=torch.long)
-        old_to_new[kept_idx] = torch.arange(kept_idx.shape[0])
-        new_edge_index = old_to_new[edge_index]
+        # old_to_new = -torch.ones(receptor_mask.shape[0], dtype=torch.long)
+        # old_to_new[kept_idx] = torch.arange(kept_idx.shape[0])
+        # new_edge_index = old_to_new[edge_index]
 
-        complex_graph['receptor', 'rec_contact', 'receptor'].edge_index = new_edge_index
+        # complex_graph['receptor', 'rec_contact', 'receptor'].edge_index = new_edge_index
 
-        # update batch, ptr
-        complex_graph['receptor'].batch = complex_graph['receptor'].batch[kept_idx]
-        complex_graph['receptor'].ptr = torch.tensor([0, kept_idx.shape[0]], dtype=torch.long)
+        # # update batch, ptr
+        # complex_graph['receptor'].batch = complex_graph['receptor'].batch[kept_idx]
+        # complex_graph['receptor'].ptr = torch.tensor([0, kept_idx.shape[0]], dtype=torch.long)
 
 
 @torch.no_grad()
@@ -115,14 +115,18 @@ def sampling_fm(data_list, model, inference_steps, tr_schedule, rot_schedule, to
             # torsion
             if not model_args.no_torsion:
                 tor_perturb = (vt_tor * dt_tor).cpu().numpy()
-                # print('tor_perturb', tor_perturb)
-                torsions_per_molecule = tor_perturb.shape[0] // b
+                torsion_sizes = [int(n.item()) for n in complex_graph_batch.num_torsions.cpu()]
+                tor_perturb_parts = []
+                torsion_offset = 0
+                for size in torsion_sizes:
+                    tor_perturb_parts.append(tor_perturb[torsion_offset:torsion_offset + size])
+                    torsion_offset += size
             else:
-                tor_perturb = None
+                tor_perturb_parts = [None] * b
 
             # Apply noise
             new_data_list.extend([modify_conformer(complex_graph, tr_perturb[i:i + 1], rot_perturb[i:i + 1].squeeze(0),
-                                          tor_perturb[i * torsions_per_molecule:(i + 1) * torsions_per_molecule] if not model_args.no_torsion else None) # type: ignore
+                                          tor_perturb_parts[i]) # type: ignore
                          for i, complex_graph in enumerate(complex_graph_batch.to('cpu').to_data_list())])
             data_list = new_data_list
 

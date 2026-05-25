@@ -3,7 +3,13 @@ args:
   all_atoms: ${common.all_atoms}
   atom_max_neighbors: ${common.atom_max_neighbors}
   atom_radius: ${common.atom_radius}
+  # Force / guided training (train_guidance)
   batch_size_per_device: 8
+  guided: true
+  guided_K: 40
+  guided_k: 1.0
+  guided_weight_eps: 1.0e-8
+  guided_min_remaining: 1.0e-3
   c_alpha_max_neighbors: ${common.c_alpha_max_neighbors}
   cache_path: ${paths.data_dir}/cache
   data_dir: ${paths.data_dir}/PDBBind_processed/

@@ -4,12 +4,10 @@ import os
 import hydra
 import lightning as L
 import rootutils
-import torch
 # import torch.multiprocessing as mp
-from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from lightning import Callback, LightningDataModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
-from functools import partial
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
@@ -47,10 +45,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
     log.info(f"Instantiating model <{cfg.model._target_}>")
-    from src.module.FlowMatch import Base_FM_Model
-    basefm = Base_FM_Model.load_from_checkpoint(cfg.model.args.base_ckpt)
     from src.module.GuidedFM import Guide_FM_Model
-    model = Guide_FM_Model(args=cfg.model.args, basefm=basefm.ema)
+    model = Guide_FM_Model(args=cfg.model.args)
 
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = instantiate_callbacks(cfg.get("callbacks"))

@@ -295,5 +295,5 @@ class InferenceDataset(Dataset):
 				print(f'No p2rank prior for {name}')
 			# GT_priot = torch.from_numpy(GT_priot).float().view(1, 3) - protein_center + torch.rand_like(protein_center)
 			# complex_graph.ligand_center = GT_priot
-			torch.save(complex_graph, data_path)
+			# torch.save(complex_graph, data_path)
 			return complex_graph

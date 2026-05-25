@@ -244,31 +244,30 @@ def process_one_complex(name: str):
 		if os.path.exists(out_pt):
 			# Already computed
 			return name, "skip_exists"
-
-		# Check if files are complete
 		base_dir = f'data/PDBBind_processed/{name}'
-		if not os.path.exists(os.path.join(base_dir, f'{name}_aug_39.sdf')):
-			return name, "skip_no_aug39"
-
-		protein_path = os.path.join(base_dir, f'{name}_protein_processed.pdb')
-		if not os.path.exists(protein_path):
-			return name, "skip_no_protein"
-
-		lig_paths = [
-			os.path.join(base_dir, f"{name}_aug_{aug}.sdf")
-			for aug in range(40)
-		]
 		merged_sdf = os.path.join(base_dir, f"{name}_all_augs.sdf")
+		protein_path = os.path.join(base_dir, f'{name}_protein_processed.pdb')
+		if not os.path.exists(merged_sdf):
+			# Check if files are complete
+			if not os.path.exists(os.path.join(base_dir, f'{name}_aug_39.sdf')):
+				return name, "skip_no_aug39"
 
-		# Merge all augments into one SDF
-		merge_sdfs(lig_paths, merged_sdf)
+			if not os.path.exists(protein_path):
+				return name, "skip_no_protein"
 
-		# Remove individual augmented ligand files after merging to save space
-		for p in lig_paths:
-			try:
-				os.remove(p)
-			except OSError:
-				pass
+			lig_paths = [
+				os.path.join(base_dir, f"{name}_aug_{aug}.sdf")
+				for aug in range(40)
+			]
+			# Merge all augments into one SDF
+			merge_sdfs(lig_paths, merged_sdf)
+
+			# Remove individual augmented ligand files after merging to save space
+			for p in lig_paths:
+				try:
+					os.remove(p)
+				except OSError:
+					pass
 
 		# Call gnina
 		cmd = [
@@ -296,7 +295,7 @@ def process_one_complex(name: str):
 			# You can also log the out here
 			return name, "error_no_affinity"
 
-		torch.save({'affinities': affinities}, out_pt)
+		torch.save({'affinities': torch.tensor(affinities)}, out_pt)
 		return name, f"ok_{len(affinities)}"
 
 	except Exception as e:

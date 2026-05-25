@@ -8,13 +8,15 @@ from biopandas.pdb import PandasPdb
 from rdkit import Chem
 
 from tqdm import tqdm
+import rootutils
+rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 from src.datasets.process_mols import read_molecule, read_mol
 from src.utils2.utils import read_strings_from_txt, get_symmetry_rmsd
 
 parser = ArgumentParser()
 parser.add_argument('--config', type=FileType(mode='r'), default=None)
-parser.add_argument('--data_dir', type=str, default='/mnt/sharedata/ssd_large/users/guohl/datasets/ai4sci/pdbbind2020/PDBBind_processed', help='')
+parser.add_argument('--data_dir', type=str, default='./data/PDBBind_processed', help='')
 parser.add_argument('--results_path', type=str, default='results/finetune', help='Path to folder with trained model and hyperparameters')
 parser.add_argument('--file_suffix', type=str, default='_baseline_ligand.pdb', help='Path to folder with trained model and hyperparameters')
 parser.add_argument('--project', type=str, default='ligbind_inf', help='')
@@ -25,8 +27,8 @@ parser.add_argument('--no_id_in_filename', action='store_true', default=False, h
 args = parser.parse_args()
 
 print('Reading paths and names.')
-names = read_strings_from_txt(f'/mnt/sharedata/ssd_large/users/guohl/datasets/ai4sci/pdbbind2020/splits/timesplit_test')
-names_no_rec_overlap = read_strings_from_txt(f'/mnt/sharedata/ssd_large/users/guohl/datasets/ai4sci/pdbbind2020/splits/timesplit_test_no_rec_overlap')
+names = read_strings_from_txt(f'./data/splits/timesplit_test')
+names_no_rec_overlap = read_strings_from_txt(f'./data/splits/timesplit_test_no_rec_overlap')
 results_path_containments = os.listdir(args.results_path)
 
 all_times = []

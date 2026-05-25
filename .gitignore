@@ -7,8 +7,6 @@ data/p2rank/
 !/workdir/diffdock_confidence_model
 /notebooks/
 /results/
-/src/datasets/pdbbind.py
-/src/datasets/pdbbind_fm.py
 # Python cache
 __pycache__/
 *.pyc

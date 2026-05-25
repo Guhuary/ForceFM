@@ -1,5 +1,6 @@
 
 import copy
+import glob
 import os
 import torch
 from argparse import ArgumentParser, Namespace
@@ -9,6 +10,8 @@ import numpy as np
 import pandas as pd
 from rdkit import RDLogger
 from torch_geometric.loader import DataLoader
+import rootutils
+rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 from src.datasets.process_mols import write_mol_with_coords
 from src.utils2.inference_utils import InferenceDataset, set_nones
@@ -23,33 +26,52 @@ import warnings
 warnings.filterwarnings("ignore")
 
 parser = ArgumentParser()
-parser.add_argument('--protein_ligand_csv', type=str, default='/mnt/sharedata/ssd_large/users/guohl/datasets/ai4sci/pdbbind2020/testset_csv.csv', help='Path to a .csv file specifying the input as described in the README. If this is not None, it will be used instead of the --protein_path, --protein_sequence and --ligand parameters')
+parser.add_argument('--protein_ligand_csv', type=str, default='./data/testset_csv.csv', help='Path to a .csv file specifying the input as described in the README. If this is not None, it will be used instead of the --protein_path, --protein_sequence and --ligand parameters')
 parser.add_argument('--complex_name', type=str, default='1a0q', help='Name that the complex will be saved with')
 parser.add_argument('--protein_path', type=str, default=None, help='Path to the protein file')
 parser.add_argument('--protein_sequence', type=str, default=None, help='Sequence of the protein for ESMFold, this is ignored if --protein_path is not None')
 parser.add_argument('--ligand_description', type=str, default='CCCCC(NC(=O)CCC(=O)O)P(=O)(O)OC1=CC=CC=C1', help='Either a SMILES string or the path to a molecule file that rdkit can read')
-parser.add_argument('--esm_embeddings_path', default='/mnt/sharedata/ssd_large/users/guohl/datasets/ai4sci/pdbbind2020/esm2_3billion_embeddings.pt', type=str, help='Path to the ESM embeddings. If this is None, no ESM embeddings will be used')
+parser.add_argument('--esm_embeddings_path', default='./data/esm2_3billion_embeddings.pt', type=str, help='Path to the ESM embeddings. If this is None, no ESM embeddings will be used')
 parser.add_argument('--out_dir', type=str, default='results/finetune', help='Directory where the outputs will be written to')
 parser.add_argument('--save_visualisation', action='store_true', default=False, help='Save a pdb file with all of the steps of the reverse diffusion')
 parser.add_argument('--samples_per_complex', type=int, default=40, help='Number of samples to generate')
 
-parser.add_argument('--model_dir', type=str, default='workdir/basemodel', help='Path to folder with trained score model and hyperparameters')
-parser.add_argument('--ckpt', type=str, default='epoch_1939.ckpt', help='Checkpoint to use for the score model')
+parser.add_argument('--model_dir', type=str, default='workdir/finetune', help='Path to folder with trained score model and hyperparameters')
+parser.add_argument('--ckpt', type=str, default='last_ema.ckpt', help='Checkpoint to use for the score model')
+parser.add_argument('--base_model_dir', type=str, default=None, help='If set, --model_dir is treated as the guide model and this directory provides the frozen base model')
+parser.add_argument('--base_ckpt', type=str, default='last.ckpt', help='Checkpoint to use for the frozen base model in guided inference')
+parser.add_argument('--guidance_strength', type=float, default=1.0, help='Multiplier for the learned guidance residual')
 parser.add_argument('--confidence_model_dir', type=str, default='workdir/diffdock_confidence_model', help='Path to folder with trained confidence model and hyperparameters')
 parser.add_argument('--confidence_ckpt', type=str, default='best_model_epoch75.pt', help='Checkpoint to use for the confidence model')
 
-parser.add_argument('--batch_size', type=int, default=5, help='')
-parser.add_argument('--inference_steps', type=int, default=11, help='Number of denoising steps')
-parser.add_argument('--actual_steps', type=int, default=10, help='Number of denoising steps that are actually performed')
+parser.add_argument('--batch_size', type=int, default=2, help='')
+parser.add_argument('--inference_steps', type=int, default=20, help='Number of denoising steps')
+parser.add_argument('--actual_steps', type=int, default=18, help='Number of denoising steps that are actually performed')
 parser.add_argument('--seed', type=int, default=42, help='seed')
 args = parser.parse_known_args()[0]
 
 os.makedirs(args.out_dir, exist_ok=True)
 # from src.utils.safe_yaml_loader import SkipPyTagsLoader
 from omegaconf import OmegaConf
-conf = OmegaConf.load(f'{args.model_dir}/hparams.yaml')
-# fm_model_args = conf.args
-fm_model_args = OmegaConf.merge(conf.args, conf.data.args)
+
+def load_model_args(model_dir):
+    candidates = [
+        os.path.join(model_dir, 'hparams.yaml'),
+        os.path.join(model_dir, '.hydra', 'config.yaml'),
+    ]
+    candidates.extend(sorted(glob.glob(os.path.join(model_dir, 'tensorboard', 'version_*', 'hparams.yaml'))))
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        conf = OmegaConf.load(path)
+        model_args = conf.args if 'args' in conf else conf.model.args
+        model_args = OmegaConf.create(OmegaConf.to_container(model_args, resolve=True))
+        data_args = OmegaConf.create(OmegaConf.to_container(conf.data.args, resolve=True))
+        return OmegaConf.merge(model_args, data_args)
+    raise FileNotFoundError(f'No hparams/config yaml found under {model_dir}')
+
+fm_model_args = load_model_args(args.model_dir)
+base_model_args = load_model_args(args.base_model_dir) if args.base_model_dir is not None else None
 if args.confidence_model_dir is not None:
     with open(f'{args.confidence_model_dir}/model_parameters.yml') as f:
         confidence_args = Namespace(**yaml.full_load(f))
@@ -60,10 +82,10 @@ if args.protein_ligand_csv is not None:
     df = pd.read_csv(args.protein_ligand_csv)
     complex_name_list = set_nones(df['complex_name'].tolist())[:num]
     protein_path_list = set_nones(df['protein_path'].tolist())[:num]
-    protein_path_list = [os.path.join('/mnt/sharedata/ssd_large/users/guohl/datasets/ai4sci/pdbbind2020', p[5:]) for p in protein_path_list] # type: ignore
+    # protein_path_list = [os.path.join('./data', p[5:]) for p in protein_path_list] # type: ignore
     protein_sequence_list = set_nones(df['protein_sequence'].tolist())[:num]
     ligand_description_list = set_nones(df['ligand_description'].tolist())[:num]
-    ligand_description_list = [os.path.join('/mnt/sharedata/ssd_large/users/guohl/datasets/ai4sci/pdbbind2020', p[5:]) for p in ligand_description_list] # type: ignore
+    ligand_description_list = [os.path.join('./data', p[5:]) for p in ligand_description_list] # type: ignore
 else:
     complex_name_list = [args.complex_name]
     protein_path_list = [args.protein_path]
@@ -145,9 +167,66 @@ def get_diffdock_confidence_model(args, t_to_sigma=t_to_sigma_conf, confidence_m
                             args.rmsd_classification_cutoff, list) else 1)
     return model
 
-from src.module.FlowMatch import Base_FM_Model
-flow_model = Base_FM_Model.load_from_checkpoint(f'{args.model_dir}/{args.ckpt}')
-model = copy.deepcopy(flow_model.ema).eval()
+from src.models.get_model import get_vector_field
+
+def load_vector_field_from_checkpoint(model_dir, ckpt_name, model_args):
+    model = get_vector_field(model_args)
+    blob = torch.load(f'{model_dir}/{ckpt_name}', map_location=torch.device('cpu'))
+    state_dict = blob.get('state_dict', blob) if isinstance(blob, dict) else blob
+
+    candidates = ['ema.module.model.', 'ema.module.', 'model.', '']
+    last_error = None
+    model_keys = set(model.state_dict().keys())
+    for prefix in candidates:
+        if prefix:
+            filtered = {
+                key[len(prefix):]: value
+                for key, value in state_dict.items()
+                if key.startswith(prefix) and key[len(prefix):] in model_keys
+            }
+        else:
+            filtered = {
+                key: value
+                for key, value in state_dict.items()
+                if key in model_keys
+            }
+        if not filtered:
+            continue
+        try:
+            model.load_state_dict(filtered, strict=True)
+            model.eval()
+            return model
+        except RuntimeError as e:
+            last_error = e
+    raise RuntimeError(f'Could not load vector field from {model_dir}/{ckpt_name}: {last_error}')
+
+
+class GuidedVectorField(torch.nn.Module):
+    def __init__(self, base_model, guide_model, guidance_strength):
+        super().__init__()
+        self.base_model = base_model
+        self.guide_model = guide_model
+        self.guidance_strength = guidance_strength
+
+    def forward(self, data):
+        base_tr, base_rot, base_tor = self.base_model(data)
+        guide_tr, guide_rot, guide_tor = self.guide_model(data)
+        return (
+            base_tr + self.guidance_strength * guide_tr,
+            base_rot + self.guidance_strength * guide_rot,
+            base_tor + self.guidance_strength * guide_tor,
+        )
+
+
+if args.base_model_dir is None:
+    model = load_vector_field_from_checkpoint(args.model_dir, args.ckpt, fm_model_args)
+else:
+    base_model = load_vector_field_from_checkpoint(args.base_model_dir, args.base_ckpt, base_model_args)
+    guide_model = load_vector_field_from_checkpoint(args.model_dir, args.ckpt, fm_model_args)
+    model = GuidedVectorField(base_model, guide_model, args.guidance_strength)
+
+model = model.to(device)
+model.eval()
 
 if args.confidence_model_dir is not None:
     confidence_model = get_diffdock_confidence_model(confidence_args, t_to_sigma=t_to_sigma_conf, confidence_mode=True)
@@ -248,8 +327,4 @@ for idx, orig_complex_graph in tqdm(enumerate(test_loader)):
 print(f'Failed for {failures} complexes')
 print(f'Skipped {skipped} complexes')
 print(f'Results are in {args.out_dir}')
-
-
-
-
 

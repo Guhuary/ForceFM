@@ -31,4 +31,13 @@ args:
   lr: 5e-5
   w_decay: 1e-4
 
-  base_ckpt: workdir/basemodel/model.ckpt
+  # Frozen base vector-field weights. A matching hparams.yaml must be in the same directory.
+  basemodel: workdir/basemodel/last.ckpt
+
+  # Monte Carlo anchors + Boltzmann weighting (aligned with pdbbind_fm defaults)
+  guided_K: ${data.args.guided_K}
+  guided_k: ${data.args.guided_k}
+  guided_weight_eps: ${data.args.guided_weight_eps}
+  tr_sigma_max: ${data.args.tr_sigma_max}
+  rot_sigma_max: ${data.args.rot_sigma_max}
+  tor_sigma_max: ${data.args.tor_sigma_max}
